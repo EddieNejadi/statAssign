@@ -1,0 +1,4 @@
+dummy pos dummy this is a nice book
+dummy neg dummy i hate this
+dummy neg dummy really not so nice !
+dummy pos dummy just nice
