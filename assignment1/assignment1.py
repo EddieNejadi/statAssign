@@ -57,12 +57,11 @@ def train_nb(training_docs):
 	neg_lst_len = len(neg_lst)
 	voc_len = len(voc)
 	
-	# print(voc_len, pos_lst_len, neg_lst_len)
 	
 	pos_fd = Counter(pos_lst)
 	neg_fd = Counter(neg_lst)
 	
-	# implimentation od Laplac smoothing
+	# implementation of Laplace smoothing
 	for (v,fn) in pos_fd.iteritems():
 		pos[v] = log10((fn + 1)) - log10((pos_lst_len + voc_len))
 
@@ -103,7 +102,7 @@ def evaluate_nb(classifier_data, evaluation_documents):
     correct_nr = 0
     for (sentiment, doc) in evaluation_documents:
     	if sentiment == classify_nb(classifier_data, doc): correct_nr += 1
-    	# else: print "The sentiment is wrong: " + sentiment
+    	# else: print "The sentiment is wrong: " + sentiment + " Doc is:" + str(doc)
 
     return correct_nr / len(evaluation_documents)
 
@@ -112,3 +111,53 @@ def evaluate_nb(classifier_data, evaluation_documents):
 Global
 '''
 if __name__ == '__main__': main()
+
+
+'''
+	Error analysis:
+	Item 1:
+		DOCUMENT:
+			'health neg 366.txt 
+			i have found another product that i want to recommend . 
+			it 's called alert and is sold by consultants like avon , but you can also go the starlight
+			website and order it . it 's a nutritional supplement and for me does provide energy without 
+			the jitters , and as a bonus i do n't feel hungry when i 'm using it . they also have a product 
+			specifically for weight loss . i have tried that as well . i did feel a bit jittery at first.. . 
+			but it settled after a week or so of taking it . 
+			i would recommend it also . i used it a few years ago and lost 35 lbs . i did consistent diet and
+			exercise which obviously is what did the weight loss , but i credit the supplement with giving 
+			me the energy to get moving and helping me curb cravings . i 'm now looking for energy and help 
+			maintaining that weightless so for me the alert does both of what i need ... 
+			energy and hunger control and it 's less expensive than the weight loss supplement so i now use it . 
+			i 've used this for years and have not had any problems .'
+		REASON:
+			It is hard to judge on this comment only by wight of the words since this comment is very long.
+	Item 2:
+		DOCUMENT:
+			'health pos 715.txt 
+			you wo n't have to use much lotion on your body after using this product . i love it... .
+		REASON:
+			It is impossible to make the machine understand of consequence of the first sentence 
+			with the implemented algorithm in this assignment.
+	Item 3:
+		DOCUMENT:
+			'dvd neg 885.txt well , at least the movie is faithful to its source in its spirit . based on a book 
+			written on 1902 , it 's nostalgia of the british empire belongs to that era . the plot deals with a 
+			soldier who is expelled from his regiment for refusing to go to fight a colonial war in sudan because
+			of his impending marriage . not only his colleagues regard him now as a coward , but also his future wife . 
+			he had no choice then but to go to war to prove he is a real man and not a coward . the filmmakers try 
+			nothing in terms to bring the material up to date , to our more contemporary ( and one hopes , 
+			more enlightened ) attitudes . there 's no post colonial guilt here whatsoever . in some ways , this 
+			speaks well of the filmmakers in terms of not trying to tamper with the original material ; in another way , 
+			it is a bit shocking seeing such jingoism in a contemporary movie . all of this would n't matter much if 
+			the movie was entertaining ; unfortunately , it is only intermittently so'
+		REASON:
+			This comment have many positive wighted words which are mostly irrelevant.
+	Item 4:
+		DOCUMENT:
+		'music pos 165.txt 
+		this was not a waste of brad 's time or mine . good job !'
+		REASON:
+		This comment contains more negative words compare to positive ones. if our implementation 
+		consider negate sentences, this comment would be classified correctly.
+'''
