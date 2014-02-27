@@ -114,6 +114,9 @@ if __name__ == '__main__': main()
 
 
 '''
+	Accuracy:
+	Running this program on my laptop gave me 81.45 percent accuracy
+
 	Error analysis:
 	Item 1:
 		DOCUMENT:
