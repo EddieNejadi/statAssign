@@ -28,8 +28,6 @@ import external_classifiers
 Function definitions
 '''
 
-def main():
-    lern_cur()
 
 # Learning curve
 def lern_cur():
@@ -69,6 +67,19 @@ def eval_by_labale(lable, docs, trained_data):
     all_lab = [(l, doc) for (l,doc) in docs if l == lable] # number of labled docs which is correct
     return {"precision": len(corr_lab)/len(gss_lab), "recall": len(corr_lab)/len(all_lab)}
 
+
+# Computing a confidence interval for the accuracy
+def cal_conf_intr():
+    all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+    all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
+    split_point = int(0.8*len(all_docs))
+    results = []
+    train_docs = all_docs[:split_point]
+    eval_docs = all_docs[split_point:]
+    trained_data = assignment1.train_nb(train_docs)
+    for (s,d) in eval_docs:
+        results.append( s == assignment1.classify_nb(trained_data,d))
+    print acc_ci(results, 0.95)
 
 def acc_ci(evals, significance):
     """Returns the lower and upper bounds of a confidence interval for the '
@@ -154,4 +165,6 @@ def random_testset(ts):
 '''
 Global
 '''
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    # lern_cur()
+    cal_conf_intr()
