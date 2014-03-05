@@ -1,4 +1,0 @@
-statAssign
-==========
-
-My assignments
