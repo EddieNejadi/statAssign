@@ -31,46 +31,53 @@ Function definitions
 
 # Learning curve
 def lern_cur():
+    """Shows a learning curve of assignment1 classifier
+    """
     sizes = range(1,11)
     accuracies = est_acc(len(sizes))
-    # print sizes
-    print accuracies
+    # print accuracies
     pyplot.plot(sizes, accuracies[:len(sizes)], 'ro')
     pyplot.show()
     
 # Estimating the accuracy
 def est_acc(size = 1):
-    all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+    """Returns a list of booleans that shows if classifier guess is correct or not
+        
+        size is number that document would divide to; it can be used for cross validation 
+    """
+    all_docs = assignment1.read_corpus("all_sentiment_shuffled.txt")
     all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
     split_point = int(0.8*len(all_docs))
     results = []
     train_docs = all_docs[:split_point]
     eval_docs = all_docs[split_point:]
 
-    # print "len train_docs:" + str(len(train_docs)) + "  size:" + str(size)
     trained_data_pices = [train_docs[i:i+size] for i in range(0, len(train_docs), size)]
 
     for n in range(0,size):
         trained_data = assignment1.train_nb(train_docs[n:int((n + 1)*(len(train_docs)/size))])
         results.append(assignment1.evaluate_nb(trained_data,eval_docs))
         
-    # print "accuracy is: " + str( int (assignment1.evaluate_nb(trained_data,eval_docs) * 10000) / 100 ) + "%"
-    # print "precision for positive class is: " + str(eval_by_labale("pos",eval_docs, trained_data).get("precision"))
-    # print "recall is for positive class: " + str(eval_by_labale("pos",eval_docs, trained_data).get("recall"))
     return results
 
 
 def eval_by_labale(lable, docs, trained_data):
-    
-    corr_lab = [(l, doc) for (l,doc) in docs if l == lable and lable == assignment1.classify_nb(trained_data, doc)] # number of labled docs which is correct
-    gss_lab = [(l, doc) for (l,doc) in docs if lable == assignment1.classify_nb(trained_data, doc)] # number of labled docs which is correct
-    all_lab = [(l, doc) for (l,doc) in docs if l == lable] # number of labled docs which is correct
+    """Calculate precision and recall and return it as dictionary structure
+    """
+    corr_lab = [(l, doc) for (l,doc) in docs if l == lable and lable == assignment1.classify_nb(trained_data, doc)] # number of labeled docs which is correct
+    gss_lab = [(l, doc) for (l,doc) in docs if lable == assignment1.classify_nb(trained_data, doc)] # number of labeled docs which is correct
+    all_lab = [(l, doc) for (l,doc) in docs if l == lable] # number of labeled docs which is correct
     return {"precision": len(corr_lab)/len(gss_lab), "recall": len(corr_lab)/len(all_lab)}
 
 
-# Computing a confidence interval for the accuracy
-def cal_conf_intr(classifier = "assignment1"):
-    all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+
+def classify(classifier):
+    """Returns a list of booleans that shows if classifier guess is correct or not
+
+        classifier is either assignment1 or scikit classifier 
+    """
+
+    all_docs = assignment1.read_corpus("all_sentiment_shuffled.txt")
     all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
     split_point = int(0.8*len(all_docs))
     results = []
@@ -86,14 +93,22 @@ def cal_conf_intr(classifier = "assignment1"):
             results.append(s == ec.classify_sk(d, trained_data))
     else :
         print "Please set classifier as assignment1 or scikit"
-    # for (s,d) in eval_docs:
-    #     if classifier == "assignment1": results.append( s == assignment1.classify_nb(trained_data,d))
-    #     else : results.append(s == ec.classify_sk(d, trained_data))
     return results
+
+# Computing a confidence interval for the accuracy
+def cal_conf_intr(classifier = "assignment1"):
+    return acc_ci(classify(classifier), 0.95)
+
 
 # Implement the cross-validation method. Then estimate the accuracy and compute a new confidence interval.
 def cross_val(N = 5):
-    all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+    """Returns Returns a list of booleans that shows if classifier guess is correct or not 
+        for whole test iterations
+        And it prints confidence interval of whole test iterations
+
+        N is number for iteration in document to divided to training and test parts 
+    """
+    all_docs = assignment1.read_corpus("all_sentiment_shuffled.txt")
     all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
     results = []
     for fold_nbr in range(N):
@@ -104,34 +119,40 @@ def cross_val(N = 5):
         trained_data = assignment1.train_nb(train_docs)
         for (s,d) in eval_docs:
             results.append( s == assignment1.classify_nb(trained_data,d))
+    print acc_ci(results, 0.95)
     return results
 
 # Comparing two classifiers
 def comp_classifiers():
-    # 
-    result1 = cal_conf_intr("assignment1")
-    result2 = cal_conf_intr("scikit")
+    """Compare assignment1 and external_classifiers 'scikit' by mcnemar_difftest
+
+        Returns boolean as significantly difference
+    """
+    result1 = classify("assignment1")
+    result2 = classify("scikit")
     return mcnemar_difftest(result1, result2, 0.95)
 
 # Implement the bootstrapping algorithm
 def bootstrap_resampling():
-
-    random.seed(1) # for testing only
-
+    """
+    """
+    num_test_sets = 1000
     results = cross_val()
-    # results = cal_conf_intr()
     accuracies = []
     rts_results = []
-    for n in range(1000):
+    for _n in range(num_test_sets):
         rad_ts = random_testset(results)
         accuracies.append(len([i for i in rad_ts if i]) / len(results))
         rts_results += rad_ts
     pyplot.hist(accuracies, bins=50)
     pyplot.show()
-    mcnemar_difftest(results, rts_results, 0.95)
-    # print "Corss validation confidence interval" + str(acc_ci(results, 0.95))
-    # print "Bootstrap_resampling confidence interval" + str(acc_ci(rts_results, 0.95))
+    sorted(accuracies)
+    lower = accuracies[int(num_test_sets * 0.025)]
+    upper = accuracies[int(num_test_sets * 0.975)]
+    print "Cross-validation confidence interval: " + str(acc_ci(results, 0.95))
+    print "Bootstrap_resampling confidence interval: " + str((lower,upper))
 
+    # return (lower, upper)
 
 
 def acc_ci(evals, significance):
@@ -219,26 +240,12 @@ def random_testset(ts):
 Global
 '''
 if __name__ == '__main__':
-    # lern_cur()
-    # l,u = acc_ci(cal_conf_intr(), 0.95)
-    # print (l, u, u-l)
-    # l,u = acc_ci(cross_val(), 0.95)
-    # print (l, u, u-l)
-    # all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
-    # all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
-    # split_point = int(0.8*len(all_docs))
-    # results = []
-    # train_docs = all_docs[:split_point]
-    # eval_docs = all_docs[split_point:]
-    # trained_data = ec.train_sk(train_docs)
-    # for (s,d) in eval_docs:
-    #     results.append(s == ec.classify_sk(d, trained_data))
-    # l,u = acc_ci(cal_conf_intr(), 0.95)
-    # print len(results)
-    # print len([r for r in results if r])
-    # print (l, u, u-l)
-    # print comp_classifiers()
-    # print random_testset(range(0,10))
-    # print random_testset([True,True,True,False])
-    print bootstrap_resampling()
+    """Simply runs all required function on the assignment 2
+    """
+    lern_cur()
+    print cal_conf_intr()
+    cross_val()
+    print comp_classifiers()
+    bootstrap_resampling()
+    
 
