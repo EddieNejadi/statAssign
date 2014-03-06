@@ -21,7 +21,7 @@ from matplotlib import pyplot
 import external modules
 '''
 import assignment1
-import external_classifiers
+import external_classifiers as ec
 
 
 '''
@@ -69,17 +69,52 @@ def eval_by_labale(lable, docs, trained_data):
 
 
 # Computing a confidence interval for the accuracy
-def cal_conf_intr():
+def cal_conf_intr(classifier = "assignment1"):
     all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
     all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
     split_point = int(0.8*len(all_docs))
     results = []
     train_docs = all_docs[:split_point]
     eval_docs = all_docs[split_point:]
-    trained_data = assignment1.train_nb(train_docs)
-    for (s,d) in eval_docs:
-        results.append( s == assignment1.classify_nb(trained_data,d))
-    print acc_ci(results, 0.95)
+    if classifier == "assignment1":
+        trained_data = assignment1.train_nb(train_docs)
+        for (s,d) in eval_docs:
+            results.append( s == assignment1.classify_nb(trained_data,d))    
+    elif classifier == "scikit":
+        trained_data = ec.train_sk(train_docs)
+        for (s,d) in eval_docs:
+            results.append(s == ec.classify_sk(d, trained_data))
+    else :
+        print "Please set classifier as assignment1 or scikit"
+    # for (s,d) in eval_docs:
+    #     if classifier == "assignment1": results.append( s == assignment1.classify_nb(trained_data,d))
+    #     else : results.append(s == ec.classify_sk(d, trained_data))
+    return results
+
+# Implement the cross-validation method. Then estimate the accuracy and compute a new confidence interval.
+def cross_val(N = 4):
+    all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+    all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
+    results = []
+    for fold_nbr in range(N):
+        split_point_1 = int(float(fold_nbr)/N*len(all_docs))
+        split_point_2 = int(float(fold_nbr+1)/N*len(all_docs))
+        train_docs = all_docs[:split_point_1] + all_docs[split_point_2:]
+        eval_docs = all_docs[split_point_1:split_point_2]
+        trained_data = assignment1.train_nb(train_docs)
+        for (s,d) in eval_docs:
+            results.append( s == assignment1.classify_nb(trained_data,d))
+    return results
+
+# Comparing two classifiers
+def comp_classifiers():
+    # 
+    result1 = cal_conf_intr("assignment1")
+    result2 = cal_conf_intr("scikit")
+    return mcnemar_difftest(result1, result2, 0.95)
+
+
+
 
 def acc_ci(evals, significance):
     """Returns the lower and upper bounds of a confidence interval for the '
@@ -167,4 +202,22 @@ Global
 '''
 if __name__ == '__main__':
     # lern_cur()
-    cal_conf_intr()
+    # l,u = acc_ci(cal_conf_intr(), 0.95)
+    # print (l, u, u-l)
+    # l,u = acc_ci(cross_val(), 0.95)
+    # print (l, u, u-l)
+    # all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
+    # all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
+    # split_point = int(0.8*len(all_docs))
+    # results = []
+    # train_docs = all_docs[:split_point]
+    # eval_docs = all_docs[split_point:]
+    # trained_data = ec.train_sk(train_docs)
+    # for (s,d) in eval_docs:
+    #     results.append(s == ec.classify_sk(d, trained_data))
+    # l,u = acc_ci(cal_conf_intr(), 0.95)
+    # print len(results)
+    # print len([r for r in results if r])
+    # print (l, u, u-l)
+    print comp_classifiers()
+
