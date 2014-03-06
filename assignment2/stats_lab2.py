@@ -34,7 +34,7 @@ def lern_cur():
     sizes = range(1,11)
     accuracies = est_acc(len(sizes))
     # print sizes
-    # print accuracies
+    print accuracies
     pyplot.plot(sizes, accuracies[:len(sizes)], 'ro')
     pyplot.show()
     
@@ -92,7 +92,7 @@ def cal_conf_intr(classifier = "assignment1"):
     return results
 
 # Implement the cross-validation method. Then estimate the accuracy and compute a new confidence interval.
-def cross_val(N = 4):
+def cross_val(N = 5):
     all_docs = assignment1.read_corpus("../assignment1/all_sentiment_shuffled.txt")
     all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
     results = []
@@ -113,6 +113,24 @@ def comp_classifiers():
     result2 = cal_conf_intr("scikit")
     return mcnemar_difftest(result1, result2, 0.95)
 
+# Implement the bootstrapping algorithm
+def bootstrap_resampling():
+
+    random.seed(1) # for testing only
+
+    results = cross_val()
+    # results = cal_conf_intr()
+    accuracies = []
+    rts_results = []
+    for n in range(1000):
+        rad_ts = random_testset(results)
+        accuracies.append(len([i for i in rad_ts if i]) / len(results))
+        rts_results += rad_ts
+    pyplot.hist(accuracies, bins=50)
+    pyplot.show()
+    mcnemar_difftest(results, rts_results, 0.95)
+    # print "Corss validation confidence interval" + str(acc_ci(results, 0.95))
+    # print "Bootstrap_resampling confidence interval" + str(acc_ci(rts_results, 0.95))
 
 
 
@@ -219,5 +237,8 @@ if __name__ == '__main__':
     # print len(results)
     # print len([r for r in results if r])
     # print (l, u, u-l)
-    print comp_classifiers()
+    # print comp_classifiers()
+    # print random_testset(range(0,10))
+    # print random_testset([True,True,True,False])
+    print bootstrap_resampling()
 
