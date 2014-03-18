@@ -20,8 +20,9 @@ from math import log10
 '''
 Function definitions
 '''
-def main():
-	all_docs = read_corpus("all_sentiment_shuffled.txt")
+def run():
+	# all_docs = read_corpus("all_sentiment_shuffled.txt")
+	all_docs = read_corpus("../assignment1/all_sentiment_shuffled.txt")
 	# all_docs = read_corpus("toy_dataset.txt")
 	all_docs = [(sentiment, doc) for (_, sentiment, doc) in all_docs]
 	split_point = int(0.8*len(all_docs))
@@ -110,7 +111,7 @@ def evaluate_nb(classifier_data, evaluation_documents):
 '''
 Global
 '''
-if __name__ == '__main__': main()
+if __name__ == '__main__': run()
 
 
 '''
