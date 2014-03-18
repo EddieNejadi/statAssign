@@ -22,7 +22,34 @@ Function definitions
 '''
 
 def run():
-    print __name__
+    all_docs = read_tagged_corpus(corpus_file)
+    print len(all_docs)
+    training, test = split_data(all_docs)
+    print len(training)
+    print len(test)
+    print len(test) + len(training)
+
+
+def split_data(all_docs):
+    """ Split the data to traing part 80% and 
+        testing part 20% 
+
+        all_docs is a list
+    """
+    split_point = int(0.8*len(all_docs))
+    results = []
+    train_docs = all_docs[:split_point]
+    eval_docs = all_docs[split_point:]
+    return (train_docs, eval_docs)
+
+
+
+
+
+
+
+
+
 
 # functions to read the corpus
 
@@ -131,6 +158,7 @@ Global
 '''
 START = "<DUMMY_START_TAG>"
 END = "<DUMMY_END_TAG>"
+corpus_file = "/home/eddie/Documents/Statistical methods labs/assignment3/english.tagged"
 
 if __name__ == "__main__":
     run()
