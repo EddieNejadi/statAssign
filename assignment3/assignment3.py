@@ -33,10 +33,11 @@ def run():
 	print tagger
 	print 'Accuracy: %4.2f%%' % (100.0 * tagger.evaluate(test))
 	# print training[:1]
-	emission, transition = hmm_train_tagger(training)
+	# emission, transition, tags = hmm_train_tagger(training)
+	tagger_data = hmm_train_tagger(training)
 	tags = []
 	for sent in training:
-		tags.append(hmm_tag_sentence((emission, transition), sent))
+		tags.append(hmm_tag_sentence(tagger_data, sent))
 
 
 def split_data(all_docs):
@@ -98,6 +99,8 @@ def hmm_train_tagger(tagged_sentences):
 	# emission = {"wt": {}, "t": {}}
 	# transition = {}
 	dic = {"wt": {}, "t": {}, "tt" :{}}
+	# Considering unknown tages a only one time eccurance
+	# add_one(dic["t"], "<UNKNOWN>")
 	# for sent in tagged_sentences[:2]:
 	# initial START and END tag value in emission as default 
 	# emission["t"][START] = 0
@@ -158,23 +161,44 @@ def hmm_train_tagger(tagged_sentences):
 		lamda2 = dic["tt"][(t1,t2)] / dic["t"][t1]
 		transition[(t1,t2)] = log10(lamda2 + lamda1)
 		# transition[(t1,t2)] = 10
-	return (emission, transition)
+	return (emission, transition, dic["t"].keys() )
 
 
 def hmm_tag_sentence(tagger_data, sentence):
 	# apply the Viterbi algorithm
 	lst = viterbi(tagger_data, sentence)
 	# then retrace your steps
-	return retrace(END, lst)
 	# finally return the list of tagged words
-	pass
+	return retrace(END, lst)
+	# pass
 
 
 
 def viterbi(tagger_data, sentence):
 	# make a dummy item with a START tag, no predecessor, and log probability 0
-	# current list = [ the dummy item ]
-	
+	current_list = [(START, 0.0)]
+	# previous_list = [current_list]
+
+	emission, _transition, all_tags = tagger_data
+
+	for w,_t in sentence:
+		# for t in all_docs:
+		# 	if (w,t) in emission:
+		# 		return t
+		# Getting a list of available tags for the word
+		w_tags = [t for t in all_tags if (w,t) in emission]
+		# For empty list, considering <UNKNOWN> word
+		if not w_tages:
+			current_list.append([(w, 0.0)])
+		else:
+			tmp = []	
+			for w_tag in w_tages:
+				tmp.append(w_tag, emission[(w,w_tag)])
+			current_list.append(tmp)
+	# Need to add END tag to list and done
+
+
+
 	# for each word in the sentence:
 	#    previous list = current list
 	#    current list = []        
@@ -184,6 +208,7 @@ def viterbi(tagger_data, sentence):
 	#         add the highest-scoring item with this tag to the current list
 
 	# end the sequence with a dummy: the highest-scoring item with the tag END
+
 	pass
 	
 def find_best_item(word, tag, possible_predecessors):    
