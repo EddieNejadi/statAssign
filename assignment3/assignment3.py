@@ -144,6 +144,7 @@ def hmm_train_tagger(tagged_sentences):
 def hmm_tag_sentence(tagger_data, sentence):
 	lst = viterbi(tagger_data, sentence)
 	best_seq = find_best_sequence(tagger_data, lst)
+	# best_seq = find_bsr(tagger_data, lst, []) # Recursive function
 	return zip([w for w,_t in sentence], [t for t,_l in best_seq])
 
 def viterbi(tagger_data, sentence):
@@ -173,7 +174,7 @@ def find_best_sequence(tagger_data, seqs):
 
 		return a list of best (tag, possible log) for each words of sentence
 	"""
-	_emission, transition, all_tags = tagger_data
+	_emission, transition, _all_tags = tagger_data
 	best_seq = [seqs[0][0]]
 	for i,seq in enumerate(seqs[1:]):
 		tmp = []
@@ -181,10 +182,38 @@ def find_best_sequence(tagger_data, seqs):
 			if (best_seq[-1][0], t) in transition:
 				tmp.append((t, l + transition[(best_seq[-1][0], t)]))
 			else:
+				print "in the function"
 				tmp.append((t, l + transition[(u"<MIN>",u"<MIN>")]))
 
 		best_seq.append(max(tmp, key = lambda t: t[1]))
 	return best_seq[1:-1]
+
+# Recursive implementation of find_best_sequence()
+def find_bsr(tagger_data, seqs, acc):
+	""" tagger_data is tables of possibilities
+		seqs is all possible tags with emission probabilities for each words of sentence
+		acc is an accumulator which should be initialized with empty list
+
+		return a list of best (tag, possible log) for each words of sentence
+	"""
+	# Base case 
+	if not seqs : return acc[1:-1]
+	_emission, transition, _all_tags = tagger_data
+	# first time initialize the accumulator with START tag
+	if not acc : 
+		acc = [seqs[0][0]]
+		return find_bsr(tagger_data, seqs[1:], acc)
+	tmp = []
+	seq = seqs[:1][0]
+	for t,l in seq:
+		if (acc[-1][0], t) in transition:
+			tmp.append((t, l + transition[(acc[-1][0], t)]))
+		else:
+			tmp.append((t, (l + transition[(u"<MIN>",u"<MIN>")])))
+	acc.append(max(tmp, key = lambda t: t[1]))
+	return find_bsr(tagger_data,seqs[1:], acc)
+
+
 	
 def find_best_item(word, tag, possible_predecessors):    
 	# determine the emission probability: 
@@ -227,6 +256,7 @@ Global
 START = "<DUMMY_START_TAG>"
 END = "<DUMMY_END_TAG>"
 corpus_file = "english.tagged"
+# corpus_file = "persian.tagged"
 
 if __name__ == "__main__":
 	run()
