@@ -24,20 +24,41 @@ Function definitions
 
 def run():
 	all_docs = read_tagged_corpus(corpus_file)
-	print len(all_docs)
-	training, test = split_data(all_docs)
-	print len(training)
-	print len(test)
-	print len(test) + len(training)
+	# print len(all_docs)
+	training, testing = split_data(all_docs)
+	# print len(training)
+	# print len(test)
+	# print len(test) + len(training)
 	tagger = train_nltk_baseline(training)
-	print tagger
-	print 'Accuracy: %4.2f%%' % (100.0 * tagger.evaluate(test))
+	# print tagger
+	print 'Accuracy of train_nltk_baseline is: %4.2f%%' % (100.0 * tagger.evaluate(testing))
 	# print training[:1]
 	# emission, transition, tags = hmm_train_tagger(training)
+	seen_words = set([w for sent in training for w,_t in sent])
 	tagger_data = hmm_train_tagger(training)
-	tags = []
-	for sent in training:
-		tags.append(hmm_tag_sentence(tagger_data, sent))
+	w_tags = []
+	errors = []
+	testing_size = 0
+	not_seen = 0
+	not_seen_error = 0
+	# for sent in training[:1]:
+	# 	print viterbi(tagger_data, sent)
+	for sent in testing:
+		w_tags = hmm_tag_sentence(tagger_data, sent)
+		for i, (w,t) in enumerate(w_tags):
+			testing_size += 1
+			if w not in seen_words: not_seen += 1
+			if t != sent[i][1]:
+				errors.append(sent[i][0])
+				if sent[i][0] not in seen_words : not_seen_error +=1
+	accuracy = (testing_size - len(errors)) / testing_size
+	print 'Accuracy of my tagger is: %4.2f%%' % (100.0 * accuracy)
+	accuracy_not_seen = (not_seen - not_seen_error) / not_seen
+	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
+	print sorted(errors)
+
+	# for er in errors:
+	# 	if er not in seen_words: not_seen_error +=1
 
 
 def split_data(all_docs):
@@ -152,31 +173,51 @@ def hmm_train_tagger(tagged_sentences):
 	# print w
 	# print dic["wt"][("see","VB")]
 	# print sum([ dic["wt"][wx,tx] for wx,tx in dic["wt"] if wx == "see"])
+	tmp_min = 0.0
 	for w,t in dic["wt"]:
 		emission[(w,t)] = log10( dic["wt"][(w,t)] / sum([ dic["wt"][wx,tx] for wx,tx in dic["wt"] if wx == w]))
+		if tmp_min > emission[(w,t)] : tmp_min = emission[(w,t)]
+	emission[(u"<MIN>",u"<MIN>")] = tmp_min
 	
 	any_tag_sum = sum([dic["t"][t] for t in dic["t"]])
+	tmp_min = 0.0
 	for t1,t2 in dic["tt"]:
 		lamda1 = dic["t"][t2] / any_tag_sum
 		lamda2 = dic["tt"][(t1,t2)] / dic["t"][t1]
 		transition[(t1,t2)] = log10(lamda2 + lamda1)
-		# transition[(t1,t2)] = 10
+		if tmp_min > transition[(t1,t2)] : tmp_min = transition[(t1,t2)]
+	transition[(u"<MIN>",u"<MIN>")] = tmp_min
+
 	return (emission, transition, dic["t"].keys() )
 
 
 def hmm_tag_sentence(tagger_data, sentence):
 	# apply the Viterbi algorithm
 	lst = viterbi(tagger_data, sentence)
+	# print sentence
+	# print "============================="
+	# print find_best_sequence(tagger_data, lst)
+	# print "============================="
+	best_seq = find_best_sequence(tagger_data, lst)
+	# print [w for w,_t in sentence]
+	# print "============================="
+	# print type(lst)
+	# for item in lst:
+	# 	print item 
+	# 	print type(item)
+
+	result = zip([w for w,_t in sentence], [t for t,_l in best_seq])
+	return result
 	# then retrace your steps
 	# finally return the list of tagged words
-	return retrace(END, lst)
+	# return retrace(END, lst)
 	# pass
 
 
 
 def viterbi(tagger_data, sentence):
 	# make a dummy item with a START tag, no predecessor, and log probability 0
-	current_list = [(START, 0.0)]
+	current_list = [[(START, 0.0)]]
 	# previous_list = [current_list]
 
 	emission, _transition, all_tags = tagger_data
@@ -187,16 +228,16 @@ def viterbi(tagger_data, sentence):
 		# 		return t
 		# Getting a list of available tags for the word
 		w_tags = [t for t in all_tags if (w,t) in emission]
-		# For empty list, considering <UNKNOWN> word
-		if not w_tages:
-			current_list.append([(w, 0.0)])
+		# For empty list, considering <UNKNOWN> word as minimum value in table
+		if not w_tags:
+			current_list.append([(w, emission[(u"<MIN>",u"<MIN>")])])
 		else:
 			tmp = []	
-			for w_tag in w_tages:
-				tmp.append(w_tag, emission[(w,w_tag)])
+			for w_tag in w_tags:
+				tmp.append((w_tag, emission[(w,w_tag)]))
 			current_list.append(tmp)
 	# Need to add END tag to list and done
-
+	current_list.append([(END, 0.0)])
 
 
 	# for each word in the sentence:
@@ -209,7 +250,27 @@ def viterbi(tagger_data, sentence):
 
 	# end the sequence with a dummy: the highest-scoring item with the tag END
 
-	pass
+	return current_list
+
+# sequence 
+def find_best_sequence(tagger_data, seqs):
+	""" tagger_data is tables of possibilities
+		seqs is all possible tags with emission probabilities for each words of sentence
+
+		return a list of best (tag, possible log) for each words of sentence
+	"""
+	_emission, transition, all_tags = tagger_data
+	best_seq = [seqs[0][0]]
+	for i,seq in enumerate(seqs[1:]):
+		tmp = []
+		for t,l in seq:
+			if (best_seq[-1][0], t) in transition:
+				tmp.append((t, l + transition[(best_seq[-1][0], t)]))
+			else:
+				tmp.append((t, l + transition[(u"<MIN>",u"<MIN>")]))
+
+		best_seq.append(max(tmp, key = lambda t: t[1]))
+	return best_seq[1:-1]
 	
 def find_best_item(word, tag, possible_predecessors):    
 	# determine the emission probability: 
@@ -247,7 +308,7 @@ def retrace(end_item, sentence_length):
 
 def add_one(dic, key):
 	""" Helper function to add one to counter in dictionary
-		It will add number one if key does not exist
+		It would initialize key with number one if the key does not exist
 	"""
 	if key in dic:
 		counter_tmp = dic[key]
