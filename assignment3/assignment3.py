@@ -46,7 +46,19 @@ def run():
 	print 'Accuracy of my tagger is: %4.2f%%' % (100.0 * accuracy)
 	accuracy_not_seen = (not_seen - not_seen_error) / not_seen
 	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
-	print sorted(errors)
+	# print sorted(errors)
+	print len(errors)
+	# ss = [("this", "t"),("is", "t"),("the", "t"),("data", "t"),("i235", "t")]
+	# print "sample sentence length is:" + str(len(ss))
+	# viterbi_result = viterbi(tagger_data, ss)
+	# print viterbi_result
+	# print "viterbi_result length is:" + str(len(viterbi_result))
+	# sq = find_sequences(tagger_data, viterbi_result)
+	# print sq
+	# print "sq length is:" + str(len(sq))
+	# bs = fbs(sq,tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")] )
+	# print bs
+	# print "best sequence length is:" + str(len(bs))
 
 
 
@@ -105,7 +117,9 @@ def train_nltk_baseline(tagged_sentences):
 
 def hmm_train_tagger(tagged_sentences):
 	dic = {"wt": {}, "t": {}, "tt" :{}}
-
+	fdist = nltk.FreqDist(word.lower() for sentence in tagged_sentences for word,_t in sentence)
+	hapaxes = set(fdist.hapaxes())
+	# print len(hapaxes)
 	for sent in tagged_sentences:
 		add_one(dic["t"], START)
 		add_one(dic["wt"], (START, START))
@@ -115,6 +129,8 @@ def hmm_train_tagger(tagged_sentences):
 			add_one(dic["wt"], (w,t))
 			add_one(dic["t"], t)
 			add_one(dic["tt"], (last_tag,t))
+			if w in hapaxes: 
+				add_one(dic["wt"], (u"<UNKNOWN>", t))
 			last_tag = t
 		
 		add_one(dic["t"], END)
@@ -125,7 +141,11 @@ def hmm_train_tagger(tagged_sentences):
 	transition = {}
 	tmp_min = 0.0
 	for w,t in dic["wt"]:
-		emission[(w,t)] = log10( dic["wt"][(w,t)] / sum([ dic["wt"][wx,tx] for wx,tx in dic["wt"] if wx == w]))
+		# P(t|w) = count(w,t)/count(w) which was wrong 
+		# emission[(w,t)] = log10( dic["wt"][(w,t)] / sum([ dic["wt"][wx,tx] for wx,tx in dic["wt"] if wx == w]))
+		
+		# P(w|t)=count(w,t)/count(t)
+		emission[(w,t)] = log10( dic["wt"][(w,t)] / dic["t"][t])
 		if tmp_min > emission[(w,t)] : tmp_min = emission[(w,t)]
 	emission[(u"<MIN>",u"<MIN>")] = tmp_min
 	
@@ -138,13 +158,16 @@ def hmm_train_tagger(tagged_sentences):
 		if tmp_min > transition[(t1,t2)] : tmp_min = transition[(t1,t2)]
 	transition[(u"<MIN>",u"<MIN>")] = tmp_min
 
+
 	return (emission, transition, dic["t"].keys() )
 
 
 def hmm_tag_sentence(tagger_data, sentence):
 	lst = viterbi(tagger_data, sentence)
-	best_seq = find_best_sequence(tagger_data, lst)
+	# best_seq = find_best_sequence(tagger_data, lst)
 	# best_seq = find_bsr(tagger_data, lst, []) # Recursive function
+	sq = find_sequences(tagger_data,lst)
+	best_seq = fbs(sq, tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")])
 	return zip([w for w,_t in sentence], [t for t,_l in best_seq])
 
 def viterbi(tagger_data, sentence):
@@ -154,18 +177,73 @@ def viterbi(tagger_data, sentence):
 	emission, _transition, all_tags = tagger_data
 
 	for w,_t in sentence:
+		tmp = []	
 		w_tags = [t for t in all_tags if (w,t) in emission]
-		# For empty list, considering <UNKNOWN> word as minimum value in table
+		# For empty list, considering <UNKNOWN> word 
 		if not w_tags:
-			current_list.append([(w, emission[(u"<MIN>",u"<MIN>")])])
+			# current_list.append([(u"<UNKNOWN>", emission[(u"<MIN>",u"<MIN>")])])
+			# current_list.append([(w, emission[(u"<MIN>",u"<MIN>")])])
+			for tag in all_tags:
+				if (u"<UNKNOWN>", tag) in emission:
+					tmp.append((tag, emission[(u"<UNKNOWN>",tag)]))
 		else:
-			tmp = []	
 			for w_tag in w_tags:
 				tmp.append((w_tag, emission[(w,w_tag)]))
-			current_list.append(tmp)
+		current_list.append(tmp)
 	current_list.append([(END, 0.0)])
 
 	return current_list
+
+def find_sequences(tagger_data, words_tags):
+	emission, transition, all_tags = tagger_data
+	seqs = []
+	for i, word_tags in enumerate(words_tags):
+		# back tracking parent nods, this list stores a  word before tags with transition probability   
+		bt = []
+		for t, ep in word_tags:
+		# check if it is the last tag jump
+			if t != START:
+				last_w_tags = words_tags[i-1]
+				for last_w_tag,_ep in last_w_tags:
+					if (last_w_tag, t) in transition:
+						bt.append((last_w_tag, transition[(last_w_tag, t)]))
+					else:
+						tmp_max = transition[(u"<MIN>",u"<MIN>")]
+						for tag in all_tags:
+							if (u"<UNKNOWN>" ,tag) in emission and (last_w_tag, tag) in transition:
+								if tmp_max < transition[(last_w_tag, tag)]:
+									tmp_max = transition[(last_w_tag, tag)]
+						bt.append((last_w_tag, tmp_max))
+		seqs.append((t, ep, bt))
+	return seqs[::-1]
+
+def fbs(seqs, min_etp, recursive = False):
+	if recursive : 
+		return fbsr(seqs, min_etp, [])
+	best_tags = []
+	for t, ep, bt in seqs:
+		max_tmp = (u"<UNKNOWN>", min_etp)
+		for last_tag, tp in bt:
+			if max_tmp[1] < ( ep + tp ):
+				max_tmp = t, ( ep + tp )
+		best_tags.append(max_tmp)
+	return best_tags[::-1][1:-1]
+
+# Recursive implementation
+def fbsr(seqs, min_etp, acc):
+	# Base case 
+	if not seqs:
+		return acc[::-1][1:-1]
+
+	t, ep, bt = seqs[0]
+	max_tmp = (u"<UNKNOWN>", min_etp)
+	for last_tag, tp in bt:
+		if max_tmp[1] < ( ep + tp ):
+			max_tmp = t, ( ep + tp )
+	acc.append(max_tmp)
+	return fbsr(seqs[1:], min_etp, acc)
+
+
 
 # sequence 
 def find_best_sequence(tagger_data, seqs):
@@ -182,7 +260,7 @@ def find_best_sequence(tagger_data, seqs):
 			if (best_seq[-1][0], t) in transition:
 				tmp.append((t, l + transition[(best_seq[-1][0], t)]))
 			else:
-				print "in the function"
+				# print "in the function"
 				tmp.append((t, l + transition[(u"<MIN>",u"<MIN>")]))
 
 		best_seq.append(max(tmp, key = lambda t: t[1]))
