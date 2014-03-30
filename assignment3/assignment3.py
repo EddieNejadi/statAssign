@@ -46,20 +46,7 @@ def run():
 	print 'Accuracy of my tagger is: %4.2f%%' % (100.0 * accuracy)
 	accuracy_not_seen = (not_seen - not_seen_error) / not_seen
 	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
-	# print sorted(errors)
 	print len(errors)
-	# ss = [("this", "t"),("is", "t"),("the", "t"),("data", "t"),("i235", "t")]
-	# print "sample sentence length is:" + str(len(ss))
-	# viterbi_result = viterbi(tagger_data, ss)
-	# print viterbi_result
-	# print "viterbi_result length is:" + str(len(viterbi_result))
-	# sq = find_sequences(tagger_data, viterbi_result)
-	# print sq
-	# print "sq length is:" + str(len(sq))
-	# bs = fbs(sq,tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")] )
-	# print bs
-	# print "best sequence length is:" + str(len(bs))
-
 
 
 def split_data(all_docs):
@@ -141,9 +128,6 @@ def hmm_train_tagger(tagged_sentences):
 	transition = {}
 	tmp_min = 0.0
 	for w,t in dic["wt"]:
-		# P(t|w) = count(w,t)/count(w) which was wrong 
-		# emission[(w,t)] = log10( dic["wt"][(w,t)] / sum([ dic["wt"][wx,tx] for wx,tx in dic["wt"] if wx == w]))
-		
 		# P(w|t)=count(w,t)/count(t)
 		emission[(w,t)] = log10( dic["wt"][(w,t)] / dic["t"][t])
 		if tmp_min > emission[(w,t)] : tmp_min = emission[(w,t)]
@@ -164,8 +148,6 @@ def hmm_train_tagger(tagged_sentences):
 
 def hmm_tag_sentence(tagger_data, sentence):
 	lst = viterbi(tagger_data, sentence)
-	# best_seq = find_best_sequence(tagger_data, lst)
-	# best_seq = find_bsr(tagger_data, lst, []) # Recursive function
 	sq = find_sequences(tagger_data,lst)
 	best_seq = fbs(sq, tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")])
 	return zip([w for w,_t in sentence], [t for t,_l in best_seq])
@@ -181,8 +163,6 @@ def viterbi(tagger_data, sentence):
 		w_tags = [t for t in all_tags if (w,t) in emission]
 		# For empty list, considering <UNKNOWN> word 
 		if not w_tags:
-			# current_list.append([(u"<UNKNOWN>", emission[(u"<MIN>",u"<MIN>")])])
-			# current_list.append([(w, emission[(u"<MIN>",u"<MIN>")])])
 			for tag in all_tags:
 				if (u"<UNKNOWN>", tag) in emission:
 					tmp.append((tag, emission[(u"<UNKNOWN>",tag)]))
@@ -242,80 +222,6 @@ def fbsr(seqs, min_etp, acc):
 			max_tmp = t, ( ep + tp )
 	acc.append(max_tmp)
 	return fbsr(seqs[1:], min_etp, acc)
-
-
-
-# sequence 
-def find_best_sequence(tagger_data, seqs):
-	""" tagger_data is tables of possibilities
-		seqs is all possible tags with emission probabilities for each words of sentence
-
-		return a list of best (tag, possible log) for each words of sentence
-	"""
-	_emission, transition, _all_tags = tagger_data
-	best_seq = [seqs[0][0]]
-	for i,seq in enumerate(seqs[1:]):
-		tmp = []
-		for t,l in seq:
-			if (best_seq[-1][0], t) in transition:
-				tmp.append((t, l + transition[(best_seq[-1][0], t)]))
-			else:
-				# print "in the function"
-				tmp.append((t, l + transition[(u"<MIN>",u"<MIN>")]))
-
-		best_seq.append(max(tmp, key = lambda t: t[1]))
-	return best_seq[1:-1]
-
-# Recursive implementation of find_best_sequence()
-def find_bsr(tagger_data, seqs, acc):
-	""" tagger_data is tables of possibilities
-		seqs is all possible tags with emission probabilities for each words of sentence
-		acc is an accumulator which should be initialized with empty list
-
-		return a list of best (tag, possible log) for each words of sentence
-	"""
-	# Base case 
-	if not seqs : return acc[1:-1]
-	_emission, transition, _all_tags = tagger_data
-	# first time initialize the accumulator with START tag
-	if not acc : 
-		acc = [seqs[0][0]]
-		return find_bsr(tagger_data, seqs[1:], acc)
-	tmp = []
-	seq = seqs[:1][0]
-	for t,l in seq:
-		if (acc[-1][0], t) in transition:
-			tmp.append((t, l + transition[(acc[-1][0], t)]))
-		else:
-			tmp.append((t, (l + transition[(u"<MIN>",u"<MIN>")])))
-	acc.append(max(tmp, key = lambda t: t[1]))
-	return find_bsr(tagger_data,seqs[1:], acc)
-
-
-	
-def find_best_item(word, tag, possible_predecessors):    
-	# determine the emission probability: 
-	#  the probability that this tag will emit this word
-	
-	# find the predecessor that gives the highest total log probability,
-	#  where the total log probability is the sum of
-	#    1) the log probability of the emission,
-	#    2) the log probability of the transition from the tag of the 
-	#       predecessor to the current tag,
-	#    3) the total log probability of the predecessor
-	
-	# return a new item (tag, best predecessor, best total log probability)
-	pass
-
-def retrace(end_item, sentence_length):
-	# tags = []
-	# item = predecessor of end_item
-	# while the tag of the item isn't START:
-	#     add the tag of item to tags
-	#     item = predecessor of item
-	# reverse the list of tags and return it
-	pass
-
 
 
 def add_one(dic, key):
