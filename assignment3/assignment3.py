@@ -47,20 +47,7 @@ def run():
 	print 'Accuracy of my tagger is: %4.2f%%' % (100.0 * accuracy)
 	accuracy_not_seen = (not_seen - not_seen_error) / not_seen
 	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
-	print len(errors)
-	
-	ss = [("this", "t"),("is", "t"),("the", "t"),("data", "t"),("i235", "t")]
-	print viterbi_new(tagger_data, ss)
-	# print "sample sentence length is:" + str(len(ss))
- # 	viterbi_result = viterbi(tagger_data, ss)
- # 	print viterbi_result
- # 	print "viterbi_result length is:" + str(len(viterbi_result))
- # 	sq = find_sequences(tagger_data, viterbi_result)
- # 	print sq
- # 	print "sq length is:" + str(len(sq))
- # 	bs = fbs(sq,tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")] )
- # 	print bs
- # 	print "best sequence length is:" + str(len(bs))
+	print "Error list length is:" + str(len(errors))
 
 def split_data(all_docs):
 	""" Split the data to taring part 80% and 
@@ -141,7 +128,6 @@ def hmm_train_tagger(tagged_sentences):
 	transition = {}
 	tmp_min = 0.0
 	for w,t in dic["wt"]:
-		# P(w|t)=count(w,t)/count(t)
 		emission[(w,t)] = log10( dic["wt"][(w,t)] / dic["t"][t])
 		if tmp_min > emission[(w,t)] : tmp_min = emission[(w,t)]
 	emission[(u"<MIN>",u"<MIN>")] = tmp_min
@@ -160,19 +146,19 @@ def hmm_train_tagger(tagged_sentences):
 
 
 def hmm_tag_sentence(tagger_data, sentence):
-	# lst = viterbi(tagger_data, sentence)
-	# sq = find_sequences(tagger_data,lst)
-	# best_seq = fbs(sq, tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")])
-	# return zip([w for w,_t in sentence], [t for t,_l in best_seq])
-	best_tags = viterbi_new(tagger_data, sentence)
+	best_tags = viterbi(tagger_data, sentence)
 	return zip([w for w,_t in sentence], best_tags)
 
 def viterbi(tagger_data, sentence):
+	""" calculates the most probable tag sequence for the sentence
+	"""
+	# Contains a list of list for each word; inner list contains (tag, emission probability) for each tag
 	# make a dummy item with a START tag, no predecessor, and log probability 0
-	current_list = [[(START, 0.0)]]
+	words_tags_list = [[(START, 0.0)]]
 
 	emission, transition, all_tags = tagger_data
 
+	# For each word in sentence, generating a list of (tag, emission probability) based on training data
 	for w,_t in sentence:
 		tmp = []	
 		w_tags = [t for t in all_tags if (w,t) in emission]
@@ -185,106 +171,36 @@ def viterbi(tagger_data, sentence):
 		else:
 			for w_tag in w_tags:
 				tmp.append((w_tag, emission[(w,w_tag)]))
-		current_list.append(tmp)
-	current_list.append([(END, 0.0)])
+		words_tags_list.append(tmp)
+	words_tags_list.append([(END, 0.0)])
 
-
-
-
-	return current_list
-
-def viterbi_new(tagger_data, sentence):
-	# print sentence
-	# make a dummy item with a START tag, no predecessor, and log probability 0
-	current_list = [[(START, 0.0)]]
-
-	emission, transition, all_tags = tagger_data
-
-	for w,_t in sentence:
-		tmp = []	
-		w_tags = [t for t in all_tags if (w,t) in emission]
-		# For empty list, considering <UNKNOWN> word 
-		if not w_tags:
-			# Considering all tags only if they are tagged for hapaxes 
-			for tag in all_tags:
-				if (u"<UNKNOWN>", tag) in emission:
-					tmp.append((tag, emission[(u"<UNKNOWN>",tag)]))
-		else:
-			for w_tag in w_tags:
-				tmp.append((w_tag, emission[(w,w_tag)]))
-		current_list.append(tmp)
-	current_list.append([(END, 0.0)])
-
+	# New changes ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 	# passes contains all passes as (total probability, list of tags)
+	# it initialized with start point 
 	passes = [(0.0,[START])]
-	# passes = []
-	for i, w_tags in enumerate(current_list[1:]):
-		# print len(passes)
+
+	# Ignoring start point because it is add to pass before
+	for i,w_tags in enumerate(words_tags_list[1:]):
+		# For each word passes get updated
 		new_passes = []
-		max_pass = [max(passes)]
-		for total_prb, tag_pass in max_pass:
-			# print w_tags
+		# Only considering the max probable tag sequence for the words before
+		for total_prb, tag_pass in [max(passes)]:
+			# Iterating in all tags of the word
 			for t, ep in w_tags:
+				# Check if last tag and new tag have transition probability 
 				if (tag_pass[-1], t) in transition:
 					p = total_prb + ep + transition[(tag_pass[-1], t)] 
-					# print (total_prb , ep , transition[(tag_pass[-1], t)]) 
+				# if not considering minimum value 
 				else:
 					p = total_prb + ep + transition[(u"<MIN>",u"<MIN>")] 
-					# print (total_prb , ep , transition[(u"<MIN>",u"<MIN>")]) 
+				# Update new pass for each tag
 				new_passes.append((p,tag_pass + [t]))
-				# new_passes.append((12.0,tag_pass + [t]))
+		# Update passes with new passes 
 		passes = copy.copy(new_passes)
+		# print len(passes)
+	# Returning most probable tag sequence without STAR and END dummy tags
 	return max(passes)[1][1:-1]
-
-def find_sequences(tagger_data, words_tags):
-	emission, transition, all_tags = tagger_data
-	seqs = []
-	for i, word_tags in enumerate(words_tags):
-		# back tracking parent nods, this list stores a  word before tags with transition probability   
-		bt = []
-		for t, ep in word_tags:
-		# check if it is the last tag jump
-			if t != START:
-				last_w_tags = words_tags[i-1]
-				for last_w_tag,_ep in last_w_tags:
-					if (last_w_tag, t) in transition:
-						bt.append((last_w_tag, transition[(last_w_tag, t)]))
-					else:
-						tmp_max = transition[(u"<MIN>",u"<MIN>")]
-						for tag in all_tags:
-							if (u"<UNKNOWN>" ,tag) in emission and (last_w_tag, tag) in transition:
-								if tmp_max < transition[(last_w_tag, tag)]:
-									tmp_max = transition[(last_w_tag, tag)]
-						bt.append((last_w_tag, tmp_max))
-		seqs.append((t, ep, bt))
-	return seqs[::-1]
-
-def fbs(seqs, min_etp, recursive = False):
-	if recursive : 
-		return fbsr(seqs, min_etp, [])
-	best_tags = []
-	for t, ep, bt in seqs:
-		max_tmp = (u"<UNKNOWN>", min_etp)
-		for last_tag, tp in bt:
-			if max_tmp[1] < ( ep + tp ):
-				max_tmp = t, ( ep + tp )
-		best_tags.append(max_tmp)
-	return best_tags[::-1][1:-1]
-
-# Recursive implementation
-def fbsr(seqs, min_etp, acc):
-	# Base case 
-	if not seqs:
-		return acc[::-1][1:-1]
-
-	t, ep, bt = seqs[0]
-	max_tmp = (u"<UNKNOWN>", min_etp)
-	for last_tag, tp in bt:
-		if max_tmp[1] < ( ep + tp ):
-			max_tmp = t, ( ep + tp )
-	acc.append(max_tmp)
-	return fbsr(seqs[1:], min_etp, acc)
-
+	# END New changes +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def add_one(dic, key):
 	""" Helper function to add one to counter in dictionary
