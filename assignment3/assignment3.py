@@ -49,6 +49,9 @@ def run():
 	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
 	print "Error list length is:" + str(len(errors))
 
+	ss = [("this", "t"),("is", "t"),("the", "t"),("data", "t"),("i235", "t")]
+	print viterbi(tagger_data, ss, True)
+
 def split_data(all_docs):
 	""" Split the data to taring part 80% and 
 		testing part 20% 
@@ -149,7 +152,7 @@ def hmm_tag_sentence(tagger_data, sentence):
 	best_tags = viterbi(tagger_data, sentence)
 	return zip([w for w,_t in sentence], best_tags)
 
-def viterbi(tagger_data, sentence):
+def viterbi(tagger_data, sentence, test_flag = False):
 	""" calculates the most probable tag sequence for the sentence
 	"""
 	# Contains a list of list for each word; inner list contains (tag, emission probability) for each tag
@@ -179,12 +182,25 @@ def viterbi(tagger_data, sentence):
 	# it initialized with start point 
 	passes = [(0.0,[START])]
 
+	if test_flag:
+		print words_tags_list
+		new_passes = []
 	# Ignoring start point because it is add to pass before
 	for i,w_tags in enumerate(words_tags_list[1:]):
-		# For each word passes get updated
-		new_passes = []
-		# Only considering the max probable tag sequence for the words before
-		for total_prb, tag_pass in [max(passes)]:
+
+		# Only considering the maximum probable tag sequences for the word before
+		max_passes = []
+
+		if test_flag:
+			last_tags = []
+			last_tags =[t for t,_ep in words_tags_list[i]]
+			print "Last_tags are: " + str(last_tags)
+			print "passes are:" + str(new_passes)
+			print "max_passes are:" + str(max_passes)
+				
+		for total_prb, tag_pass in passes:
+			# For each word passes get updated
+			new_passes = []
 			# Iterating in all tags of the word
 			for t, ep in w_tags:
 				# Check if last tag and new tag have transition probability 
@@ -195,9 +211,9 @@ def viterbi(tagger_data, sentence):
 					p = total_prb + ep + transition[(u"<MIN>",u"<MIN>")] 
 				# Update new pass for each tag
 				new_passes.append((p,tag_pass + [t]))
+			max_passes.append(max(new_passes))
 		# Update passes with new passes 
-		passes = copy.copy(new_passes)
-		# print len(passes)
+		passes = copy.copy(max_passes)
 	# Returning most probable tag sequence without STAR and END dummy tags
 	return max(passes)[1][1:-1]
 	# END New changes +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -215,8 +231,8 @@ def add_one(dic, key):
 '''
 Global
 '''
-START = "<DUMMY_START_TAG>"
-END = "<DUMMY_END_TAG>"
+START = u"<DUMMY_START_TAG>"
+END = u"<DUMMY_END_TAG>"
 corpus_file = "english.tagged"
 # corpus_file = "persian.tagged"
 
