@@ -16,6 +16,7 @@ import libraries
 import math
 import nltk
 from math import log10
+import copy
 
 
 '''
@@ -47,7 +48,19 @@ def run():
 	accuracy_not_seen = (not_seen - not_seen_error) / not_seen
 	print 'Accuracy of my tagger for not seen words is: %4.2f%%' % (100.0 * accuracy_not_seen)
 	print len(errors)
-
+	
+	ss = [("this", "t"),("is", "t"),("the", "t"),("data", "t"),("i235", "t")]
+	print viterbi_new(tagger_data, ss)
+	# print "sample sentence length is:" + str(len(ss))
+ # 	viterbi_result = viterbi(tagger_data, ss)
+ # 	print viterbi_result
+ # 	print "viterbi_result length is:" + str(len(viterbi_result))
+ # 	sq = find_sequences(tagger_data, viterbi_result)
+ # 	print sq
+ # 	print "sq length is:" + str(len(sq))
+ # 	bs = fbs(sq,tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")] )
+ # 	print bs
+ # 	print "best sequence length is:" + str(len(bs))
 
 def split_data(all_docs):
 	""" Split the data to taring part 80% and 
@@ -147,22 +160,25 @@ def hmm_train_tagger(tagged_sentences):
 
 
 def hmm_tag_sentence(tagger_data, sentence):
-	lst = viterbi(tagger_data, sentence)
-	sq = find_sequences(tagger_data,lst)
-	best_seq = fbs(sq, tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")])
-	return zip([w for w,_t in sentence], [t for t,_l in best_seq])
+	# lst = viterbi(tagger_data, sentence)
+	# sq = find_sequences(tagger_data,lst)
+	# best_seq = fbs(sq, tagger_data[0][(u"<MIN>",u"<MIN>")] + tagger_data[1][(u"<MIN>",u"<MIN>")])
+	# return zip([w for w,_t in sentence], [t for t,_l in best_seq])
+	best_tags = viterbi_new(tagger_data, sentence)
+	return zip([w for w,_t in sentence], best_tags)
 
 def viterbi(tagger_data, sentence):
 	# make a dummy item with a START tag, no predecessor, and log probability 0
 	current_list = [[(START, 0.0)]]
 
-	emission, _transition, all_tags = tagger_data
+	emission, transition, all_tags = tagger_data
 
 	for w,_t in sentence:
 		tmp = []	
 		w_tags = [t for t in all_tags if (w,t) in emission]
 		# For empty list, considering <UNKNOWN> word 
 		if not w_tags:
+			# Considering all tags only if they are tagged for hapaxes 
 			for tag in all_tags:
 				if (u"<UNKNOWN>", tag) in emission:
 					tmp.append((tag, emission[(u"<UNKNOWN>",tag)]))
@@ -172,7 +188,53 @@ def viterbi(tagger_data, sentence):
 		current_list.append(tmp)
 	current_list.append([(END, 0.0)])
 
+
+
+
 	return current_list
+
+def viterbi_new(tagger_data, sentence):
+	# print sentence
+	# make a dummy item with a START tag, no predecessor, and log probability 0
+	current_list = [[(START, 0.0)]]
+
+	emission, transition, all_tags = tagger_data
+
+	for w,_t in sentence:
+		tmp = []	
+		w_tags = [t for t in all_tags if (w,t) in emission]
+		# For empty list, considering <UNKNOWN> word 
+		if not w_tags:
+			# Considering all tags only if they are tagged for hapaxes 
+			for tag in all_tags:
+				if (u"<UNKNOWN>", tag) in emission:
+					tmp.append((tag, emission[(u"<UNKNOWN>",tag)]))
+		else:
+			for w_tag in w_tags:
+				tmp.append((w_tag, emission[(w,w_tag)]))
+		current_list.append(tmp)
+	current_list.append([(END, 0.0)])
+
+	# passes contains all passes as (total probability, list of tags)
+	passes = [(0.0,[START])]
+	# passes = []
+	for i, w_tags in enumerate(current_list[1:]):
+		# print len(passes)
+		new_passes = []
+		max_pass = [max(passes)]
+		for total_prb, tag_pass in max_pass:
+			# print w_tags
+			for t, ep in w_tags:
+				if (tag_pass[-1], t) in transition:
+					p = total_prb + ep + transition[(tag_pass[-1], t)] 
+					# print (total_prb , ep , transition[(tag_pass[-1], t)]) 
+				else:
+					p = total_prb + ep + transition[(u"<MIN>",u"<MIN>")] 
+					# print (total_prb , ep , transition[(u"<MIN>",u"<MIN>")]) 
+				new_passes.append((p,tag_pass + [t]))
+				# new_passes.append((12.0,tag_pass + [t]))
+		passes = copy.copy(new_passes)
+	return max(passes)[1][1:-1]
 
 def find_sequences(tagger_data, words_tags):
 	emission, transition, all_tags = tagger_data
